@@ -41,6 +41,9 @@ int string_compare(const char *str1, const char *str2)
 
 	}
 
+	if(str1[idx] - str1[idx])
+		return str1[idx] - str1[idx]; // 둘중에 하나가 null -> 길이가 다르다
+
 	return 0; // 두 문자열이 완벽히 똑같음
 }
 
