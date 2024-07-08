@@ -12,6 +12,8 @@
 #define NAMESIZE 20
 
 // 정적변수나 전역변수를 사용하지 않아서 critical Area 없다고 생각 -> 뮤텍스 필요 X
+int server_down = 0;
+pthread_mutex_t mtx;
 
 void * recv_msg(void * arg)
 {
@@ -21,18 +23,23 @@ void * recv_msg(void * arg)
 
 	while(1)
 	{
-		if((str_len = read(serv_socket,buffer,sizeof(buffer))) < 0) // 서버와의 세션 끊김
+		if((str_len = read(serv_socket,buffer,sizeof(buffer))) <=  0) // 서버와의 세션 끊김
 		{
-			if(str_len == -1)
+			if(str_len == 0)
 				printf("\nyour session with server has been disconnected!\n");
 			else
 				perror("\nread error\n");
+
+			pthread_mutex_lock(&mtx);
+			server_down = 1;
+			pthread_mutex_unlock(&mtx);
 			break;
 		}
-		sleep(1);
-		printf("\n%s",buffer); // 이미 아이디도 메시지안에 들어있음
+		else
+			printf("\n%s",buffer); // 이미 아이디도 메시지안에 들어있음
 	}
 	
+	printf("your program will down!\n");	
 	pthread_exit(0);
 	return NULL;
 }
@@ -43,6 +50,8 @@ int main(int argc, char ** argv)
 	struct sockaddr_in serv_addr;
 	pthread_t recv_thread; // 서버에게서 받을 함수동작 스레드
 	char userID[NAMESIZE];
+
+	pthread_mutex_init(&mtx,NULL);
 
 	if(argc != 2) // 실행파일 이름 + ID
 	{
@@ -68,8 +77,8 @@ int main(int argc, char ** argv)
 	memset(&serv_addr, 0, sizeof(serv_addr)); // 서버주소 구조체 초기화
 	serv_addr.sin_family = AF_INET;		  // ipv4
 
-	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	serv_addr.sin_port = htons(7889);
+	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // 서버ipv4 주소 입력
+	serv_addr.sin_port = htons(7889); // 서버 포트번호
 
 	/*-----------------------------------*/
  	// 2. connect 과정
@@ -96,11 +105,21 @@ int main(int argc, char ** argv)
 		// snprintf를 사용하면 오버플로 문제 해결
 
 		printf("\nsend : %s", msg);
+		
+		pthread_mutex_lock(&mtx);
+		if(server_down != 0) // 서버가 다운되면, 루프 탈출
+		{
+			pthread_mutex_unlock(&mtx);
+			break;
+		}
+		pthread_mutex_unlock(&mtx);
+
 		write(serv_socket, send_msg, strlen(send_msg)+1 ); // NULL도 같이 보내야 하기에
 
-		sleep(1);
+		memset(msg,0,BUFFSIZE+NAMESIZE+10);
 	}
 
 	close(serv_socket);
+	pthread_mutex_destroy(&mtx);
 	return 0;
 }

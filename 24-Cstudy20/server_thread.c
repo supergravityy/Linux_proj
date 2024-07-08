@@ -40,7 +40,8 @@ void * clnt_connect(void *arg) // 연결이 되면, read를 여기서 함.
 
 	while(1)
 	{
-		sleep(1);
+		memset(msg,NULL,BUFFSIZE);
+
 		if( (str_len = read(clnt_socket,msg,sizeof(msg))) <= 0) // 반환시, 읽어들인 바이트 수, 실패시 -1
 		{
 			if(str_len == 0)
